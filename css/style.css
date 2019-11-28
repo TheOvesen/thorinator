@@ -1,0 +1,35 @@
+body {
+  background-color: black;
+}
+
+canvas {
+  position: absolute;
+  left: 50%;
+  top: 100px;
+  transform: translateX(-50%);
+  background-color: #111;
+}
+
+.title {
+  color: white;
+  text-align: center;
+  font-family: Segoe Script;
+  font-size: 40px;
+}
+
+.instructions {
+  position: absolute;
+  left: 50%;
+  top: 200px;
+  transform: translateX(calc(-100% - 330px));
+  width: 300px;
+}
+
+.decor {
+  position: absolute;
+  left: 50%;
+  top: 200px;
+  transform: translateX(230px);
+  width: 400px;
+  opacity: 0.3;
+}
