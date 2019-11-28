@@ -4,6 +4,7 @@ const endParticleChance = 0.5;
 const midParticleChance = 0.01;
 const GLOW_LIFE = 500;
 const GLOW_LIFE_COMPARE = GLOW_LIFE << 20;
+const SPEED_FACTOR = 1000/120;
 let drawLightning = false;
 let boltID = 0;
 let lastTime = 0;
@@ -180,7 +181,7 @@ function updateGameArea(time) {
   let newUsedParticles = [];
 
   for (let i = 0; i < usedParticleList.length; i++) {
-    usedParticleList[i].update();
+    usedParticleList[i].update(time - lastTime);
 
     if (usedParticleList[i].alpha <= 0 || usedParticleList[i].y > 600 || usedParticleList[i].x < 0 || usedParticleList[i].x > 600) {
       availParticleList.push(usedParticleList[i]);
@@ -243,10 +244,10 @@ function Particle() {
   this.hspeed = 0;
   this.vspeed = 0;
   this.alpha = 1;
-  this.update = function() {
+  this.update = function(time) {
     this.vspeed += 0.2;
-    this.x += this.hspeed;
-    this.y += this.vspeed;
+    this.x += this.hspeed * (time/SPEED_FACTOR);
+    this.y += this.vspeed * (time/SPEED_FACTOR);
     this.alpha -= 0.04;
     let ctx = gameArea.context;
 
