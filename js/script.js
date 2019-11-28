@@ -3,6 +3,7 @@ const forkChance = 0.02; // 1 = 100%; default 0.02
 const endParticleChance = 0.5;
 const midParticleChance = 0.01;
 const GLOW_LIFE = 500;
+const GLOW_LIFE_COMPARE = GLOW_LIFE << 20;
 let drawLightning = false;
 let boltID = 0;
 let lastTime = 0;
@@ -12,7 +13,6 @@ let gameArea = {
   start: function() {
     this.context = this.canvas.getContext("2d")
     this.clear();
-    //this.interval = setInterval(updateGameArea, 15);
     window.requestAnimationFrame(updateGameArea);
   },
   clear: function() {
@@ -25,16 +25,10 @@ let cathode = new zapStart(10, 10);
 let anode = new zapEnd(10, 10);
 
 let usedParticleList = [];
-let availParticleList = [];/*
-for (let i = 0; i < 80; i++) {
-  availParticleList[i] = new Particle();
-}*/
+let availParticleList = [];
 
 let usedGlowList = [];
-let availGlowList = [];/*
-for (let i = 0; i < 60; i++) {
-  availGlowList[i] = new Glow();
-}*/
+let availGlowList = [];
 
 function zapStart(x, y) {
   this.x = x;
@@ -43,12 +37,12 @@ function zapStart(x, y) {
     let ctx = gameArea.context;
 
     if (drawLightning == true) {
-      let dist = Math.sqrt(Math.pow((anode.x - this.x), 2) + Math.pow((anode.y - this.y), 2));
-      let dirVect = {
-        x: (anode.x - this.x) / dist,
-        y: (anode.y - this.y) / dist
-      }
-      let angle = Math.atan2(dirVect.y, dirVect.x);
+      let dx = anode.x - this.x;
+      let dy = anode.y - this.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      let dirVectX = dx / dist;
+      let dirVectY = dy / dist;
+      let angle = Math.atan2(dirVectY, dirVectX);
       let maxVariance = dist / 4;
       let random = (Math.random() * 2) - 1;
 
@@ -62,17 +56,15 @@ function zapStart(x, y) {
       ctx.beginPath();
       ctx.moveTo(this.x, this.y);
       for (let i = 0; i < dist; i += stepLength) {
-        let posX = this.x + i * dirVect.x;
-        let posY = this.y + i * dirVect.y;
+        let posX = this.x + i * dirVectX;
+        let posY = this.y + i * dirVectY;
 
         let distVarianceFactor = Math.sin(Math.PI / (dist / i));
         let crackle = Math.random() * 40 - 20;
-        let wobble = {
-          x: Math.cos(angle + Math.PI / 2) * ((maxVariance * random) + crackle) * distVarianceFactor,
-          y: Math.sin(angle + Math.PI / 2) * ((maxVariance * random) + crackle) * distVarianceFactor
-        };
+        let wobbleX = Math.cos(angle + Math.PI / 2) * ((maxVariance * random) + crackle) * distVarianceFactor;
+        let wobbleY = Math.sin(angle + Math.PI / 2) * ((maxVariance * random) + crackle) * distVarianceFactor;
 
-        ctx.lineTo(posX + wobble.x, posY + wobble.y);
+        ctx.lineTo(posX + wobbleX, posY + wobbleY);
 
         if (Math.random() <= midParticleChance) {
           if (availParticleList.length == 0) {
@@ -83,8 +75,8 @@ function zapStart(x, y) {
           let direction = ((Math.random() * 2) - 1) * Math.PI;
           let particle = availParticleList.pop();
 
-          particle.x = posX + wobble.x;
-          particle.y = posY + wobble.y;
+          particle.x = posX + wobbleX;
+          particle.y = posY + wobbleY;
           particle.hspeed = Math.cos(direction) * speed;
           particle.vspeed = Math.sin(direction) * speed;
           particle.alpha = 1;
@@ -94,18 +86,18 @@ function zapStart(x, y) {
         }
 
         if (Math.random() <= forkChance && i > 0 && (i + stepLength) < dist) {
-          let forkAngle = Math.atan2((posY + wobble.y) - lastPoint.y, (posX + wobble.x) - lastPoint.x);
+          let forkAngle = Math.atan2((posY + wobbleY) - lastPoint.y, (posX + wobbleX) - lastPoint.x);
 
           forkArray.push({
-            x: posX + wobble.x,
-            y: posY + wobble.y,
+            x: posX + wobbleX,
+            y: posY + wobbleY,
             angle: forkAngle,
             maxLength: Math.floor((dist - i) / 2)
           });
         }
 
-        lastPoint.x = posX + wobble.x;
-        lastPoint.y = posY + wobble.y;
+        lastPoint.x = posX + wobbleX;
+        lastPoint.y = posY + wobbleY;
       }
 
       ctx.lineTo(anode.x, anode.y);
@@ -153,10 +145,7 @@ function zapStart(x, y) {
         availGlowList.push(new Glow());
       }
 
-      let newGlow = availGlowList.pop();/*
-      newGlow.x = anode.x;
-      newGlow.y = anode.y;
-      newGlow.alpha = 0.5;*/
+      let newGlow = availGlowList.pop();
       setGlowPos(newGlow, anode.x, anode.y);
       newGlow.boltid = boltID;
 
@@ -185,32 +174,37 @@ function release() {
 }
 
 function updateGameArea(time) {
+  let roundTime = time | 0;
   gameArea.clear();
+
+  let newUsedParticles = [];
 
   for (let i = 0; i < usedParticleList.length; i++) {
     usedParticleList[i].update();
 
-    if (usedParticleList[i].y > 600 || usedParticleList[i].x < 0 || usedParticleList[i].x > 600 || usedParticleList[i].alpha <= 0) {
-      availParticleList.push(usedParticleList.splice(i, 1)[0]);
+    if (usedParticleList[i].alpha <= 0 || usedParticleList[i].y > 600 || usedParticleList[i].x < 0 || usedParticleList[i].x > 600) {
+      availParticleList.push(usedParticleList[i]);
+    } else {
+      newUsedParticles.push(usedParticleList[i]);
     }
   }
 
+  usedParticleList = newUsedParticles;
+
   for (let i = 0; i < usedGlowList.length; i++) {
-    //usedGlowList[i].alpha -= 0.01;
-    usedGlowList[i].vars += (time - lastTime) << 20;
+    usedGlowList[i].vars += (roundTime - lastTime) << 20;
 
     if (i > 0 && usedGlowList[i].boltid == usedGlowList[i - 1].boltid) {
       connectGlows(usedGlowList[i], usedGlowList[i - 1]);
     }
+  }
 
-    //if (usedGlowList[i].alpha <= 0) {
-    if ((usedGlowList[i].vars >>> 20) >= GLOW_LIFE) {
-      availGlowList.push(usedGlowList.splice(i, 1)[0]);
-    }
+  if (usedGlowList.length > 0 && usedGlowList[0].vars >= GLOW_LIFE_COMPARE) {
+    availGlowList[0] = usedGlowList.shift();
   }
 
   cathode.update();
-  lastTime = time;
+  lastTime = roundTime;
   window.requestAnimationFrame(updateGameArea);
 }
 
@@ -225,7 +219,6 @@ function move(event) {
 }
 
 function looseBolt(x, y, startAngle, maxLength) {
-  //console.log([x, y, startAngle, maxLength]);
   let ctx = gameArea.context;
   let angleVariance = Math.PI / 2;
   let length = Math.random() * maxLength;
@@ -275,7 +268,7 @@ function Particle() {
 }
 
 function setGlowPos(glow, x, y) {
-  glow.vars = (x & parseInt(1111111111, 2)) + ((y & parseInt(1111111111, 2)) << 10);
+  glow.vars = (x & 0b1111111111) + ((y & 0b1111111111) << 10);
 }
 
 function Glow() {
@@ -285,14 +278,12 @@ function Glow() {
 
 function connectGlows(source, target) {
   let ctx = gameArea.context;
-  let sourceX = (source.vars & parseInt(1111111111, 2));
-  let sourceY = ((source.vars >>> 10) & parseInt(1111111111, 2));
-  let sourceLife = ((source.vars >>> 20) & parseInt(1111111111, 2));
-  let sourceAlpha = 1 - (sourceLife)/GLOW_LIFE;
-  let targetX = (target.vars & parseInt(1111111111, 2));
-  let targetY = ((target.vars >>> 10) & parseInt(1111111111, 2));
-  //console.log(sourceX);
-  //console.log(sourceY);
+  let sourceX = (source.vars & 0b1111111111);
+  let sourceY = ((source.vars >>> 10) & 0b1111111111);
+  let sourceLife = ((source.vars >>> 20) & 0b1111111111);
+  let sourceAlpha = 1 - (sourceLife) / GLOW_LIFE;
+  let targetX = (target.vars & 0b1111111111);
+  let targetY = ((target.vars >>> 10) & 0b1111111111);
 
   ctx.beginPath();
   ctx.moveTo(sourceX, sourceY);
